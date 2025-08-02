@@ -7,47 +7,63 @@
  */
 
 #include <Arduino.h>
-#include "FlyskyIBUS.h"
+#include <FlyskyIBUS.h>
 
+static constexpr HardwareSerial &USB_SERIAL = Serial0;
 static constexpr HardwareSerial &IBUS_SERIAL = Serial2;
+static constexpr uint32_t SERIAL_BAUD = 115200;
 static constexpr uint8_t IBUS_PIN = GPIO_NUM_16;
 
+//
 FlyskyIBUS ibus;
 
+//
 void setup()
 {
-    Serial.begin(115200);
-    delay(500);
+
+    //
+    USB_SERIAL.begin(SERIAL_BAUD);
+
+    //
     ibus.begin(IBUS_SERIAL, IBUS_PIN);
-    Serial.println("Flysky IBUS Plotter");
+
+    //
+    USB_SERIAL.println("IBUS Interrupt Receiver Ready");
 }
 
+//
 void loop()
 {
-    static unsigned long lastPlot = 0;
+    // Read Channels
+    printChannels();
+}
 
-    if (millis() - lastPlot > 50)
+//
+void printChannels()
+{
+    static unsigned long lastTime = 0;
+
+    if (millis() - lastTime > 10)
     {
-        lastPlot = millis();
+        lastTime = millis();
 
         if (ibus.isConnected())
         {
-            uint16_t channels[IBUS_MAX_CHANNELS];
-            ibus.readAllChannels(channels);
-            uint8_t count = ibus.getChannelCount();
-
-            for (uint8_t i = 0; i < count; i++)
+            for (size_t i = 0; i < ibus.getChannelCount(); i++)
             {
-                Serial.print(channels[i]);
-                if (i < count - 1)
-                    Serial.print(",");
+                USB_SERIAL.print(ibus.readChannel(i + 1));
+
+                if (i < ibus.getChannelCount() - 1)
+                    USB_SERIAL.print(",");
             }
-            Serial.println();
+
+            USB_SERIAL.print(" - ");
+            USB_SERIAL.print(ibus.getChannelCount());
+            USB_SERIAL.println();
         }
         else
         {
-            // Optionale Meldung – nicht plotten!
-            Serial.println("0,0,0,0,0,0");
+            USB_SERIAL.println("IBUS Signal Lost");
         }
     }
 }

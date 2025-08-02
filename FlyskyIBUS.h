@@ -39,68 +39,57 @@
  */
 
 // IBUS protocol constants
-#define IBUS_FRAME_LENGTH 32
-#define IBUS_HEADER_SIZE 2
-#define IBUS_CHECKSUM_SIZE 2
-#define IBUS_CHANNEL_DATA_SIZE 28
-#define IBUS_MAX_CHANNELS 14
-#define IBUS_BYTES_PER_CHANNEL 2
+static constexpr auto IBUS_BAUDRATE = 115200;
+static constexpr auto IBUS_FRAME_LENGTH = 32;
+static constexpr auto IBUS_MAX_CHANNELS = 14;
+static constexpr auto IBUS_SIGNAL_TIMEOUT = 100;
+static constexpr auto IBUS_HEADER_BYTE0 = 0x20;
+static constexpr auto IBUS_HEADER_BYTE1 = 0x40;
+static constexpr auto IBUS_HEADER_LENGTH = 2;
+static constexpr auto IBUS_CRC_LENGTH = 2;
+static constexpr auto PAYLOAD_HIGHBYTE = 2;
+static constexpr auto PAYLOAD_LOWBYTE = 3;
+static constexpr auto IBUS_DEFAULT_VALUE = 1500;
 
-#define IBUS_HEADER_BYTE1 0x20
-#define IBUS_HEADER_BYTE2 0x40
-
-#define IBUS_MIN_VALUE 1000
-#define IBUS_MAX_VALUE 2000
-#define IBUS_DEFAULT_VALUE 1500
-
-#define IBUS_BAUDRATE 115200
-#define IBUS_SIGNAL_TIMEOUT 1000
-
-//
 class FlyskyIBUS
 {
 public:
-    // Constructor
+    // Flysky IBUS Protocol Library
     FlyskyIBUS();
 
-    // Initialize IBUS with given Serial & Pin
-    void begin(HardwareSerial &uart = Serial2, uint8_t rxPin = 16);
+    // Initialize IBUS with UART
+    bool begin(HardwareSerial &uart, uint8_t rxPin);
 
-    // Handle incoming bytes (ISR Delegate)
-    void handleSerialInterrupt();
+    // Get value of given channel (0-based)
+    uint16_t readChannel(uint8_t channel);
 
-    // Read channel (1-based index)
-    uint16_t readChannel(uint8_t channelNumber);
-    void readAllChannels(uint16_t *channelArray);
-
-    // Status queries
+    // Returns number of decoded channels
     uint8_t getChannelCount();
+
+    //
     bool isConnected();
 
-    // Polling method (optional if no interrupts used)
-    void serialEventHandler();
-
 private:
+    // 
     HardwareSerial *_uart;
-    uint8_t _rxPin;
+    void onSerialReceive();
+    void processByte(uint8_t byte);
+    
+    // Decode channel values from frame buffer
+    void decodeChannels();
 
-    // Channel data
-    uint16_t _channels[IBUS_MAX_CHANNELS];
-    uint16_t _channelBuffer[IBUS_MAX_CHANNELS];
-    uint8_t _bufferChannelCount;
-    uint8_t _channelCount;
+    void resetBuffer();
+    void initChannels();
+
+    uint8_t _rxPin;
+    uint8_t _frame_buffer[IBUS_FRAME_LENGTH];
+    uint8_t _frame_position;
+    bool _frameStarted;
     unsigned long _lastFrameTime;
 
-    // Frame processing
-    uint8_t _frameBuffer[IBUS_FRAME_LENGTH];
-    uint8_t _framePosition;
-    bool _frameInProgress;
-    bool _headerFound;
+    // Decoded channel values
+    uint16_t _channels[IBUS_MAX_CHANNELS];
 
-    // Internal decoding logic
-    void processIbusBytes(uint8_t byte);
-    void decodeIbusChannels();
-    void copyBufferToChannels();
-    void resetIbusBuffer();
-    void initChannels();
+    // Number of channels detected
+    uint8_t _channelCount;
 };

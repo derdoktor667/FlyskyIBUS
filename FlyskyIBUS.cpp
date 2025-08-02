@@ -7,186 +7,130 @@
  */
 
 #include <Arduino.h>
-#include <HardwareSerial.h>
-#include "FlyskyIBUS.h"
+#include <FlyskyIBUS.h>
 
-// Globale Referenz für ISR-Zugriff
-static FlyskyIBUS* ibusInstance = nullptr;
-
-// Externe ISR-Funktion (Arduino-kompatibel)
-void IRAM_ATTR serialPinISR() {
-    if (ibusInstance) {
-        ibusInstance->handleSerialInterrupt();
-    }
+//
+FlyskyIBUS::FlyskyIBUS()
+    : _uart(nullptr), _rxPin(0), _frame_position(0), _frameStarted(false), _lastFrameTime(0), _channelCount(0), _frame_buffer()
+{
 }
 
-// Konstruktor
-FlyskyIBUS::FlyskyIBUS() {
-    _uart = nullptr;
-    _framePosition = 0;
-    _frameInProgress = false;
-    _bufferChannelCount = 0;
-    _channelCount = 0;
-    _lastFrameTime = 0;
-    _headerFound = false;
-    _rxPin = -1;
-
-    initChannels();
-    resetIbusBuffer();
-}
-
-// Initialisierung mit Serieller Schnittstelle und RX-Pin
-void FlyskyIBUS::begin(HardwareSerial& uart, uint8_t rxPin) {
+//
+bool FlyskyIBUS::begin(HardwareSerial &uart, uint8_t rxPin)
+{
     _uart = &uart;
     _rxPin = rxPin;
-    ibusInstance = this;
 
+    // Setup UART for IBUS
     _uart->begin(IBUS_BAUDRATE, SERIAL_8N1, _rxPin, -1);
-    _uart->flush();
 
-    attachInterrupt(digitalPinToInterrupt(_rxPin), serialPinISR, CHANGE);
-    Serial.println("IBUS: Initialized with Arduino serial interrupt");
+    // Tricky UART Interrupt 
+    _uart->onReceive([this]()
+                     { this->onSerialReceive(); });
+
+    // Prepare Channel Container
+    initChannels();
+
+    return 0;
 }
 
-// Interrupthandler - delegiert ISR-Arbeit
-void FlyskyIBUS::handleSerialInterrupt() {
-    if (!_uart) return;
-
-    delayMicroseconds(100); // Timing-Spielraum
-    while (_uart->available()) {
+//
+void FlyskyIBUS::onSerialReceive()
+{
+    while (_uart->available())
+    {
         uint8_t byte = _uart->read();
-        processIbusBytes(byte);
+
+        //
+        processByte(byte);
     }
 }
 
-// Polling-Alternative (im loop() verwendbar)
-void FlyskyIBUS::serialEventHandler() {
-    if (!_uart) return;
+//
+void FlyskyIBUS::processByte(uint8_t byte)
+{
+    //
+    if (!_frameStarted && byte == IBUS_HEADER_BYTE0)
+    {
+        _frameStarted = true;
+        _frame_position = 0;
 
-    while (_uart->available()) {
-        uint8_t byte = _uart->read();
-        processIbusBytes(byte);
+        _frame_buffer[_frame_position++] = byte;
     }
-}
-
-// Einzelnen Kanal lesen
-uint16_t FlyskyIBUS::readChannel(uint8_t channelNumber) {
-    if (channelNumber >= 1 && channelNumber <= IBUS_MAX_CHANNELS) {
-        noInterrupts();
-        uint16_t value = _channels[channelNumber - 1];
-        interrupts();
-        return value;
-    }
-    return IBUS_DEFAULT_VALUE;
-}
-
-// Alle Kanäle kopieren
-void FlyskyIBUS::readAllChannels(uint16_t* channelArray) {
-    if (!channelArray) return;
-
-    noInterrupts();
-    for (uint8_t i = 0; i < IBUS_MAX_CHANNELS; i++) {
-        channelArray[i] = _channels[i];
-    }
-    interrupts();
-}
-
-// Anzahl gültiger Kanäle
-uint8_t FlyskyIBUS::getChannelCount() {
-    noInterrupts();
-    uint8_t count = _channelCount;
-    interrupts();
-    return count;
-}
-
-// Prüfen ob Verbindung besteht
-bool FlyskyIBUS::isConnected() {
-    noInterrupts();
-    unsigned long last = _lastFrameTime;
-    interrupts();
-    return (millis() - last) < IBUS_SIGNAL_TIMEOUT;
-}
-
-// Byteweise Verarbeitung des IBUS-Datenstroms
-void FlyskyIBUS::processIbusBytes(uint8_t byte) {
-    _frameBuffer[_framePosition++] = byte;
-
-    // Header erkennen
-    if (_framePosition >= 2) {
-        if (_frameBuffer[_framePosition - 2] == IBUS_HEADER_BYTE1 &&
-            _frameBuffer[_framePosition - 1] == IBUS_HEADER_BYTE2) {
-            _frameBuffer[0] = IBUS_HEADER_BYTE1;
-            _frameBuffer[1] = IBUS_HEADER_BYTE2;
-            _framePosition = 2;
-            _frameInProgress = true;
-            _headerFound = true;
-        }
-    }
-
-    // Vollständiger Frame erkannt?
-    if (_frameInProgress && _framePosition >= IBUS_FRAME_LENGTH) {
-        uint16_t checksum = 0xFFFF;
-        for (uint8_t i = 0; i < IBUS_FRAME_LENGTH - IBUS_CHECKSUM_SIZE; i++) {
-            checksum -= _frameBuffer[i];
+    //
+    else if (_frameStarted)
+    {
+        //
+        if (_frame_position < IBUS_FRAME_LENGTH)
+        {
+            _frame_buffer[_frame_position++] = byte;
         }
 
-        uint16_t receivedChecksum = (_frameBuffer[IBUS_FRAME_LENGTH - 1] << 8) |
-                                    _frameBuffer[IBUS_FRAME_LENGTH - 2];
+        //
+        if (_frame_position >= IBUS_FRAME_LENGTH)
+        {
+            //
+            decodeChannels();
 
-        if (checksum == receivedChecksum) {
-            decodeIbusChannels();
-            copyBufferToChannels();
+            //
+            _frameStarted = false;
+            _frame_position = 0;
             _lastFrameTime = millis();
         }
-
-        _framePosition = 0;
-        _frameInProgress = false;
-        _headerFound = false;
-    }
-
-    // Überlauf verhindern
-    if (_framePosition >= IBUS_FRAME_LENGTH) {
-        _framePosition = 0;
-        _frameInProgress = false;
-        _headerFound = false;
     }
 }
 
-// IBUS-Kanäle dekodieren
-void FlyskyIBUS::decodeIbusChannels() {
-    _bufferChannelCount = 0;
-    for (uint8_t i = 0; i < IBUS_MAX_CHANNELS; i++) {
-        uint8_t lo = _frameBuffer[IBUS_HEADER_SIZE + i * IBUS_BYTES_PER_CHANNEL];
-        uint8_t hi = _frameBuffer[IBUS_HEADER_SIZE + i * IBUS_BYTES_PER_CHANNEL + 1];
-        uint16_t val = (hi << 8) | lo;
-        _channelBuffer[i] = val;
+//
+void FlyskyIBUS::decodeChannels()
+{
+    // Calculate number of channels from payload length
+    _channelCount = (_frame_buffer[0] - IBUS_HEADER_LENGTH - IBUS_CRC_LENGTH) >> 1;
 
-        if (val >= IBUS_MIN_VALUE && val <= IBUS_MAX_VALUE) {
-            _bufferChannelCount++;
-        }
+    for (size_t i = 0; i < IBUS_MAX_CHANNELS && i < _channelCount; ++i)
+    {
+        // Byte to channel merging
+        uint8_t lowByte = _frame_buffer[PAYLOAD_HIGHBYTE + i * 2];
+        uint8_t highByte = _frame_buffer[PAYLOAD_LOWBYTE + i * 2];
+
+        _channels[i] = (highByte << 8) | lowByte;
     }
 }
 
-// Zwischenspeicher in Kanäle übertragen
-void FlyskyIBUS::copyBufferToChannels() {
-    for (uint8_t i = 0; i < IBUS_MAX_CHANNELS; i++) {
-        _channels[i] = _channelBuffer[i];
-    }
-    _channelCount = _bufferChannelCount;
+//
+uint16_t FlyskyIBUS::readChannel(uint8_t channel)
+{
+    if (channel < 1 || channel > IBUS_MAX_CHANNELS)
+        return IBUS_DEFAULT_VALUE;
+    
+    //
+    return _channels[channel - 1];
 }
 
-// Frame zurücksetzen
-void FlyskyIBUS::resetIbusBuffer() {
-    _framePosition = 0;
-    _frameInProgress = false;
-    _headerFound = false;
-    memset(_frameBuffer, 0, IBUS_FRAME_LENGTH);
+//
+uint8_t FlyskyIBUS::getChannelCount()
+{
+    return _channelCount;
 }
 
-// Kanäle initialisieren
-void FlyskyIBUS::initChannels() {
-    for (uint8_t i = 0; i < IBUS_MAX_CHANNELS; i++) {
+//
+bool FlyskyIBUS::isConnected()
+{
+    return (millis() - _lastFrameTime) < IBUS_SIGNAL_TIMEOUT;
+}
+
+//
+void FlyskyIBUS::initChannels()
+{
+    // Resets channels to default value
+    for (size_t i = 0; i < IBUS_MAX_CHANNELS; i++)
+    {
         _channels[i] = IBUS_DEFAULT_VALUE;
-        _channelBuffer[i] = IBUS_DEFAULT_VALUE;
     }
+}
+
+//
+void FlyskyIBUS::resetBuffer()
+{
+    _frame_position = 0;
+    _frameStarted = false;
 }
