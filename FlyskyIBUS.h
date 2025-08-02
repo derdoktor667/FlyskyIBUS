@@ -18,18 +18,17 @@
  *
  * Byte:  0    1     2      3      4      5    ...    26     27     28     29     30    31
  * Data: 0x20 0x40 [CH1_L][CH1_H][CH2_L][CH2_H] ... [CH13L][CH13H][CH14L][CH14H][CHKL][CHKH]
- *        |    |    |<--- Channel Data (28 byte, 2 byte each, 14 chan) --->|  +  <--CRC--->                                                                                                                                     |<-CRC->|
- *        |    |    |                                                                                                                                                                                                                              |
- *        |    |    Channel 1: Low Byte + High Byte (1000-2000 µs)                                                                                                                                                                              |
- *        |    |    Channel 2: Low Byte + High Byte (1000-2000 µs)                                                                                                                                                                              |
- *        |    |    ...                                                                                                                                                                                                                          |
- *        |    |    Channel 14: Low Byte + High Byte (1000-2000 µs)                                                                                                                                                                             |
- *        |    |                                                                                                                                                                                                                                 |
- *        |    Header Byte 2 (0x40)                                                                                                                                                                                                             |
- *        |                                                                                                                                                                                                                                      |
- *        Header Byte 1 (0x20)                                                                                                                                                                                                                  |
- *                                                                                                                                                                                                                                               |
- *                                                                                                                                                                                                                           Checksum: 0xFFFF - sum(bytes 0-29)
+ *        |    |    |<--- Channel Data (28 byte, 2 byte each, 14 chan) --->|  +  <--CRC--->
+ *        |    |    |
+ *        |    |    Channel 1: Low Byte + High Byte (1000-2000 µs)
+ *        |    |    Channel 2: Low Byte + High Byte (1000-2000 µs)
+ *        |    |    ...
+ *        |    |    Channel 14: Low Byte + High Byte (1000-2000 µs)
+ *        |    |
+ *        |    Header Byte 2 (0x40)
+ *        |
+ *        Header Byte 1 (0x20)
+ *                                                                        Checksum: 0xFFFF - sum(bytes 0-29)
  *
  * Notes:
  * - Baud rate: 115200, 8N1
@@ -66,8 +65,9 @@ public:
     // Constructor
     FlyskyIBUS();
 
+    // FIXED: Default parameters belong in header, not implementation
     // Initialize IBUS with UART
-    void begin(HardwareSerial &uart, uint8_t rxPin);
+    void begin(HardwareSerial &uart = Serial2, uint8_t rxPin = GPIO_NUM_16);
 
     // Channel access functions (1-based indexing: channels 1-14)
     uint16_t readChannel(uint8_t channelNumber);
@@ -75,32 +75,39 @@ public:
 
     // Status functions
     uint8_t getChannelCount();
+    bool isConnected(); // Check if receiver is connected
 
 private:
     // UART communication
     HardwareSerial *_uart;
+    uint8_t _rxPin;
 
-    // Interrupt callback
+    // Native UART interrupt
     static FlyskyIBUS *_instance;
+    static uart_port_t _uartPort;
+
+    // Channel data (buffered, volatile for interrupt safety)
+    volatile uint16_t _channels[IBUS_MAX_CHANNELS];
+    volatile uint16_t _channelBuffer[IBUS_MAX_CHANNELS];
+    volatile uint8_t _bufferChannelCount;
+    volatile uint8_t _channelCount;
+    volatile unsigned long _lastFrameTime;
 
     // Frame processing (volatile for interrupt safety)
     volatile uint8_t _frameBuffer[IBUS_FRAME_LENGTH];
     volatile uint8_t _framePosition;
     volatile bool _frameInProgress;
+    volatile bool _headerFound;
 
-    // Channel data (buffered)
-    uint16_t _channels[IBUS_MAX_CHANNELS];
-    uint16_t _channelBuffer[IBUS_MAX_CHANNELS]; // Interrupt writes here
-    volatile uint8_t _bufferChannelCount;
-
-    // IBUS handling
-    void processIbusBytes(uint8_t byte);
-    void decodeIbusChannels();
+    // IBUS handling (interrupt-safe)
+    void IRAM_ATTR processIbusBytes(uint8_t byte);
+    void IRAM_ATTR decodeIbusChannels();
+    void IRAM_ATTR copyBufferToChannels();
     void resetIbusBuffer();
 
-    // Interrupt handling
-    static void IRAM_ATTR ibusHandler();
-    void installIbusInterrupt();
+    // Native UART interrupt handling
+    void setupUartInterrupt();
+    static void IRAM_ATTR uartInterruptHandler(void *arg);
 
     // Utility methods
     uint16_t calculateCRC();
