@@ -10,7 +10,7 @@
 #include <FlyskyIBUS.h>
 
 // Default UART2 RX Pin
-static constexpr uint8_t IBUS_PIN = 16;
+static constexpr uint8_t IBUS_PIN = 17;
 
 // Use UART2
 static constexpr HardwareSerial &IBUS_UART = Serial2;
