@@ -1,57 +1,53 @@
+/**
+ * @file read_Channels.ino
+ * @brief ESP32 Flysky IBUS Receiver Test – Arduino IDE Compatible
+ * @author Wastl Kraus
+ * @date 2025-08-01
+ * @license MIT
+ */
+
 #include <Arduino.h>
 #include "FlyskyIBUS.h"
 
+static constexpr HardwareSerial &IBUS_SERIAL = Serial2;
+static constexpr uint8_t IBUS_PIN = GPIO_NUM_16;
+
 FlyskyIBUS ibus;
 
-void setup() {
+void setup()
+{
     Serial.begin(115200);
-    delay(1000);
-    Serial.println("=== IBUS Interrupt Test ===");
-    
-    // Initialize IBUS on pin 16 - Timer interrupt handles everything!
-    ibus.begin(Serial2, 16);
-    Serial.println("IBUS Library initialized with timer interrupt!");
-    Serial.println("No update() needed in loop!");
+    delay(500);
+    ibus.begin(IBUS_SERIAL, IBUS_PIN);
+    Serial.println("Flysky IBUS Plotter");
 }
 
-void loop() {
-    // NO ibus.update() needed! Timer interrupt handles everything.
-    
-    // Check connection
-    if (ibus.isConnected()) {
-        // Display all 6 channels every 200ms
-        static unsigned long lastDisplay = 0;
-        if (millis() - lastDisplay > 200) {
-            
-            Serial.print("CH1:");
-            Serial.print(ibus.readChannel(1));
-            Serial.print(" CH2:");
-            Serial.print(ibus.readChannel(2));
-            Serial.print(" CH3:");
-            Serial.print(ibus.readChannel(3));
-            Serial.print(" CH4:");
-            Serial.print(ibus.readChannel(4));
-            Serial.print(" CH5:");
-            Serial.print(ibus.readChannel(5));
-            Serial.print(" CH6:");
-            Serial.print(ibus.readChannel(6));
-            Serial.print(" (");
-            Serial.print(ibus.getChannelCount());
-            Serial.println(" valid)");
-            
-            lastDisplay = millis();
+void loop()
+{
+    static unsigned long lastPlot = 0;
+
+    if (millis() - lastPlot > 50)
+    {
+        lastPlot = millis();
+
+        if (ibus.isConnected())
+        {
+            uint16_t channels[IBUS_MAX_CHANNELS];
+            ibus.readAllChannels(channels);
+            uint8_t count = ibus.getChannelCount();
+
+            for (uint8_t i = 0; i < count; i++)
+            {
+                Serial.print(channels[i]);
+                if (i < count - 1)
+                    Serial.print(",");
+            }
+            Serial.println();
         }
-    } else {
-        // Show connection status every 2 seconds
-        static unsigned long lastStatus = 0;
-        if (millis() - lastStatus > 2000) {
-            Serial.println("Waiting for IBUS connection...");
-            lastStatus = millis();
+        else
+        {
+            // Optionale Meldung – nicht plotten!
+            Serial.println("0,0,0,0,0,0");
         }
     }
-    
-    // Your main code can run here without worrying about IBUS!
-    // The timer interrupt handles all IBUS processing automatically.
-    
-    delay(10);
 }

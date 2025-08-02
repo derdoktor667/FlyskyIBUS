@@ -39,78 +39,68 @@
  */
 
 // IBUS protocol constants
-#define IBUS_FRAME_LENGTH 32      // Total frame length in bytes
-#define IBUS_HEADER_SIZE 2        // Header bytes (0x20, 0x40)
-#define IBUS_CHECKSUM_SIZE 2      // Checksum bytes at end
-#define IBUS_CHANNEL_DATA_SIZE 28 // Channel data: 14 channels × 2 bytes each
-#define IBUS_MAX_CHANNELS 14      // Maximum number of channels supported
-#define IBUS_BYTES_PER_CHANNEL 2  // Each channel uses 2 bytes (little-endian)
+#define IBUS_FRAME_LENGTH 32
+#define IBUS_HEADER_SIZE 2
+#define IBUS_CHECKSUM_SIZE 2
+#define IBUS_CHANNEL_DATA_SIZE 28
+#define IBUS_MAX_CHANNELS 14
+#define IBUS_BYTES_PER_CHANNEL 2
 
-// IBUS frame header bytes
 #define IBUS_HEADER_BYTE1 0x20
 #define IBUS_HEADER_BYTE2 0x40
 
-// Channel value ranges (in microseconds)
-#define IBUS_MIN_VALUE 1000     // Minimum channel value
-#define IBUS_MAX_VALUE 2000     // Maximum channel value
-#define IBUS_DEFAULT_VALUE 1500 // Default/neutral channel value
+#define IBUS_MIN_VALUE 1000
+#define IBUS_MAX_VALUE 2000
+#define IBUS_DEFAULT_VALUE 1500
 
-// Communication settings
-#define IBUS_BAUDRATE 115200     // Standard IBUS baud rate
-#define IBUS_SIGNAL_TIMEOUT 1000 // Signal timeout in milliseconds
+#define IBUS_BAUDRATE 115200
+#define IBUS_SIGNAL_TIMEOUT 1000
 
+//
 class FlyskyIBUS
 {
 public:
     // Constructor
     FlyskyIBUS();
 
-    // FIXED: Default parameters belong in header, not implementation
-    // Initialize IBUS with UART
-    void begin(HardwareSerial &uart = Serial2, uint8_t rxPin = GPIO_NUM_16);
+    // Initialize IBUS with given Serial & Pin
+    void begin(HardwareSerial &uart = Serial2, uint8_t rxPin = 16);
 
-    // Channel access functions (1-based indexing: channels 1-14)
+    // Handle incoming bytes (ISR Delegate)
+    void handleSerialInterrupt();
+
+    // Read channel (1-based index)
     uint16_t readChannel(uint8_t channelNumber);
     void readAllChannels(uint16_t *channelArray);
 
-    // Status functions
+    // Status queries
     uint8_t getChannelCount();
-    bool isConnected(); // Check if receiver is connected
+    bool isConnected();
+
+    // Polling method (optional if no interrupts used)
+    void serialEventHandler();
 
 private:
-    // UART communication
     HardwareSerial *_uart;
     uint8_t _rxPin;
 
-    // Native UART interrupt
-    static FlyskyIBUS *_instance;
-    static uart_port_t _uartPort;
+    // Channel data
+    uint16_t _channels[IBUS_MAX_CHANNELS];
+    uint16_t _channelBuffer[IBUS_MAX_CHANNELS];
+    uint8_t _bufferChannelCount;
+    uint8_t _channelCount;
+    unsigned long _lastFrameTime;
 
-    // Channel data (buffered, volatile for interrupt safety)
-    volatile uint16_t _channels[IBUS_MAX_CHANNELS];
-    volatile uint16_t _channelBuffer[IBUS_MAX_CHANNELS];
-    volatile uint8_t _bufferChannelCount;
-    volatile uint8_t _channelCount;
-    volatile unsigned long _lastFrameTime;
+    // Frame processing
+    uint8_t _frameBuffer[IBUS_FRAME_LENGTH];
+    uint8_t _framePosition;
+    bool _frameInProgress;
+    bool _headerFound;
 
-    // Frame processing (volatile for interrupt safety)
-    volatile uint8_t _frameBuffer[IBUS_FRAME_LENGTH];
-    volatile uint8_t _framePosition;
-    volatile bool _frameInProgress;
-    volatile bool _headerFound;
-
-    // IBUS handling (interrupt-safe)
-    void IRAM_ATTR processIbusBytes(uint8_t byte);
-    void IRAM_ATTR decodeIbusChannels();
-    void IRAM_ATTR copyBufferToChannels();
+    // Internal decoding logic
+    void processIbusBytes(uint8_t byte);
+    void decodeIbusChannels();
+    void copyBufferToChannels();
     void resetIbusBuffer();
-
-    // Native UART interrupt handling
-    void setupUartInterrupt();
-    static void IRAM_ATTR uartInterruptHandler(void *arg);
-
-    // Utility methods
-    uint16_t calculateCRC();
-    uint16_t getReceivedCRC();
     void initChannels();
 };
