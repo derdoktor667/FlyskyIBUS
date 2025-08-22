@@ -8,7 +8,6 @@
 
 #pragma once
 
-
 #include "FlyskyIBUS.h"
 
 // Initialize IBUS in "on the fly"
