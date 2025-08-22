@@ -9,61 +9,52 @@
 #include <Arduino.h>
 #include <FlyskyIBUS.h>
 
+// USB serial port settings
 static constexpr HardwareSerial &USB_SERIAL = Serial0;
-static constexpr HardwareSerial &IBUS_SERIAL = Serial2;
 static constexpr uint32_t SERIAL_BAUD = 115200;
+
+// UART Configuration (optional)
+static constexpr HardwareSerial &IBUS_SERIAL = Serial2;
 static constexpr uint8_t IBUS_PIN = GPIO_NUM_16;
 
-//
-FlyskyIBUS ibus;
+// Creates an IBUS receiver ready to use
+// FlyskyIBUS ibus(); // UART2 - Pin 16 default
+FlyskyIBUS ibus(IBUS_SERIAL, IBUS_PIN);
 
 //
 void setup()
 {
+    // Starts IBUS receiving
+    ibus.begin();
 
     //
     USB_SERIAL.begin(SERIAL_BAUD);
-
-    //
-    ibus.begin(IBUS_SERIAL, IBUS_PIN);
-
-    //
-    USB_SERIAL.println("IBUS Interrupt Receiver Ready");
+    USB_SERIAL.println(" === IBUS Receiver initialized === ");
 }
 
 //
 void loop()
 {
-    // Read Channels
-    printChannels();
-}
+    // No further function needed
+    // UART interrupt driven receiver
 
-//
-void printChannels()
-{
-    static unsigned long lastTime = 0;
+    // Simply get channel values
+    uint16_t ch_01 = ibus.getChannel(1);
+    uint16_t ch_02 = ibus.getChannel(2);
+    uint16_t ch_03 = ibus.getChannel(3);
+    uint16_t ch_04 = ibus.getChannel(4);
 
-    if (millis() - lastTime > 10)
-    {
-        lastTime = millis();
+    // Prints the channels to serial for example
+    USB_SERIAL.print(" ");
+    USB_SERIAL.print(ch_01);
+    USB_SERIAL.print(" - ");
+    USB_SERIAL.print(ch_02);
+    USB_SERIAL.print(" - ");
+    USB_SERIAL.print(ch_03);
+    USB_SERIAL.print(" - ");
+    USB_SERIAL.print(ch_04);
+    USB_SERIAL.println(" ");
 
-        if (ibus.isConnected())
-        {
-            for (size_t i = 0; i < ibus.getChannelCount(); i++)
-            {
-                USB_SERIAL.print(ibus.readChannel(i + 1));
-
-                if (i < ibus.getChannelCount() - 1)
-                    USB_SERIAL.print(",");
-            }
-
-            USB_SERIAL.print(" - ");
-            USB_SERIAL.print(ibus.getChannelCount());
-            USB_SERIAL.println();
-        }
-        else
-        {
-            USB_SERIAL.println("IBUS Signal Lost");
-        }
-    }
+    // Not flooding serial port
+    delay(100);
 }

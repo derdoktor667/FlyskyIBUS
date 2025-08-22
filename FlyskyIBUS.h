@@ -38,54 +38,53 @@
  * - Not all 14 channels may be active depending on transmitter configuration
  */
 
-// IBUS protocol constants
-static constexpr auto IBUS_BAUDRATE = 115200;
-static constexpr auto IBUS_FRAME_LENGTH = 32;
-static constexpr auto IBUS_MAX_CHANNELS = 14;
-static constexpr auto IBUS_SIGNAL_TIMEOUT = 100;
-static constexpr auto IBUS_HEADER_BYTE0 = 0x20;
-static constexpr auto IBUS_HEADER_BYTE1 = 0x40;
-static constexpr auto IBUS_HEADER_LENGTH = 2;
-static constexpr auto IBUS_CRC_LENGTH = 2;
-static constexpr auto PAYLOAD_HIGHBYTE = 2;
-static constexpr auto PAYLOAD_LOWBYTE = 3;
-static constexpr auto IBUS_DEFAULT_VALUE = 1500;
-
+//
 class FlyskyIBUS
 {
 public:
     // Flysky IBUS Protocol Library
-    FlyskyIBUS();
+    FlyskyIBUS(HardwareSerial &uart = Serial2, uint8_t rxPin = GPIO_NUM_16);
 
-    // Initialize IBUS with UART
-    bool begin(HardwareSerial &uart, uint8_t rxPin);
+    // Starts the IBUS receiver
+    bool begin();
 
     // Get value of given channel (0-based)
-    uint16_t readChannel(uint8_t channel);
+    uint16_t getChannel(const uint8_t channel_nr);
 
     // Returns number of decoded channels
-    uint8_t getChannelCount();
-
-    //
-    bool isConnected();
+    uint8_t getChannelCount() const { return _channelCount; }
 
 private:
-    // 
+    // --- IBUS protocol ---
+    static constexpr auto IBUS_OK = 0;
+    static constexpr auto IBUS_ERROR = 1;
+    static constexpr auto IBUS_BAUDRATE = 115200;
+    static constexpr auto IBUS_FRAME_LENGTH = 32;
+    static constexpr auto IBUS_MAX_CHANNELS = 14;
+    static constexpr auto IBUS_SIGNAL_TIMEOUT = 100;
+    static constexpr auto IBUS_DEFAULT_VALUE = 1500;
+    static constexpr auto IBUS_HEADER_BYTE0 = 0x20;
+    static constexpr auto IBUS_HEADER_BYTE1 = 0x40;
+    static constexpr auto IBUS_HEADER_LENGTH = 2;
+    static constexpr auto IBUS_CRC_LENGTH = 2;
+    static constexpr auto PAYLOAD_HIGHBYTE = 2;
+    static constexpr auto PAYLOAD_LOWBYTE = 3;
+
+    // --- Hardware Config ---
     HardwareSerial *_uart;
-    void onSerialReceive();
-    void processByte(uint8_t byte);
-    
-    // Decode channel values from frame buffer
-    void decodeChannels();
-
-    void resetBuffer();
-    void initChannels();
-
     uint8_t _rxPin;
+
+    // --- RX Buffer ---
     uint8_t _frame_buffer[IBUS_FRAME_LENGTH];
     uint8_t _frame_position;
     bool _frameStarted;
-    unsigned long _lastFrameTime;
+
+    // --- Interrupt Handling ---
+    void IRAM_ATTR _ibus_handle();
+    void _generateFrame(uint8_t byte);
+
+    // --- IBUS Decoder Helper --
+    void _decode_channels();
 
     // Decoded channel values
     uint16_t _channels[IBUS_MAX_CHANNELS];

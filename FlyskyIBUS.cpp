@@ -1,55 +1,66 @@
 /**
- * @file FlyskyIBUS.cpp - Native UART Interrupt Version
+ * @file FlyskyIBUS.cpp
  * @brief ESP32 Library for Flysky IBUS Reception and Decoding – Arduino IDE Compatible
  * @author Wastl Kraus
  * @date 2025-08-01
  * @license MIT
  */
 
-#include <Arduino.h>
-#include <FlyskyIBUS.h>
+#pragma once
 
-//
-FlyskyIBUS::FlyskyIBUS()
-    : _uart(nullptr), _rxPin(0), _frame_position(0), _frameStarted(false), _lastFrameTime(0), _channelCount(0), _frame_buffer()
+
+#include "FlyskyIBUS.h"
+
+// Initialize IBUS in "on the fly"
+FlyskyIBUS::FlyskyIBUS(HardwareSerial &uart, uint8_t rxPin) : _uart(&uart),
+                                                              _rxPin(rxPin),
+                                                              _frame_position(0),
+                                                              _frameStarted(false),
+                                                              _channelCount(0),
+                                                              _frame_buffer{uint8_t(IBUS_DEFAULT_VALUE)}
 {
 }
 
-//
-bool FlyskyIBUS::begin(HardwareSerial &uart, uint8_t rxPin)
+// IBUS receiver "install and forget"
+bool FlyskyIBUS::begin()
 {
-    _uart = &uart;
-    _rxPin = rxPin;
+    // Setup IBUS UART
+    _uart->begin(IBUS_BAUDRATE, SERIAL_8N1, _rxPin);
 
-    // Setup UART for IBUS
-    _uart->begin(IBUS_BAUDRATE, SERIAL_8N1, _rxPin, -1);
-
-    // Tricky UART Interrupt 
+    // Tricky UART Interrupt
+    // Install UART interrupt triggering IBUS handle
     _uart->onReceive([this]()
-                     { this->onSerialReceive(); });
+                     { this->_ibus_handle(); });
 
-    // Prepare Channel Container
-    initChannels();
-
-    return 0;
+    return IBUS_OK;
 }
 
-//
-void FlyskyIBUS::onSerialReceive()
+// Returns received value for given channel
+uint16_t FlyskyIBUS::getChannel(const uint8_t channel_nr)
+{
+    // Simple input filter workround
+    if (channel_nr < 1 || channel_nr > IBUS_MAX_CHANNELS)
+        return IBUS_DEFAULT_VALUE;
+
+    // Array - Human Transcoder
+    return _channels[channel_nr - 1];
+}
+
+// Reading data bytewise into frame generator
+void IRAM_ATTR FlyskyIBUS::_ibus_handle()
 {
     while (_uart->available())
     {
-        uint8_t byte = _uart->read();
-
-        //
-        processByte(byte);
+        // Feed the generator
+        uint8_t received_byte = _uart->read();
+        _generateFrame(received_byte);
     }
 }
 
-//
-void FlyskyIBUS::processByte(uint8_t byte)
+// Generates the actual IBUS frame and start processing
+void FlyskyIBUS::_generateFrame(uint8_t byte)
 {
-    //
+    // Find IBUS frame start marking
     if (!_frameStarted && byte == IBUS_HEADER_BYTE0)
     {
         _frameStarted = true;
@@ -57,31 +68,30 @@ void FlyskyIBUS::processByte(uint8_t byte)
 
         _frame_buffer[_frame_position++] = byte;
     }
-    //
+    // Fill up the frame buffer
     else if (_frameStarted)
     {
-        //
+        // Receiving frame bytes
         if (_frame_position < IBUS_FRAME_LENGTH)
         {
             _frame_buffer[_frame_position++] = byte;
         }
 
-        //
+        // End of IBUS frame reached
         if (_frame_position >= IBUS_FRAME_LENGTH)
         {
-            //
-            decodeChannels();
+            // TODO: use reference and return values
+            _decode_channels();
 
-            //
+            // Dirty restart frame container
             _frameStarted = false;
             _frame_position = 0;
-            _lastFrameTime = millis();
         }
     }
 }
 
-//
-void FlyskyIBUS::decodeChannels()
+// Reading and decoding buffer values into buffer array
+void FlyskyIBUS::_decode_channels()
 {
     // Calculate number of channels from payload length
     _channelCount = (_frame_buffer[0] - IBUS_HEADER_LENGTH - IBUS_CRC_LENGTH) >> 1;
@@ -94,43 +104,4 @@ void FlyskyIBUS::decodeChannels()
 
         _channels[i] = (highByte << 8) | lowByte;
     }
-}
-
-//
-uint16_t FlyskyIBUS::readChannel(uint8_t channel)
-{
-    if (channel < 1 || channel > IBUS_MAX_CHANNELS)
-        return IBUS_DEFAULT_VALUE;
-    
-    //
-    return _channels[channel - 1];
-}
-
-//
-uint8_t FlyskyIBUS::getChannelCount()
-{
-    return _channelCount;
-}
-
-//
-bool FlyskyIBUS::isConnected()
-{
-    return (millis() - _lastFrameTime) < IBUS_SIGNAL_TIMEOUT;
-}
-
-//
-void FlyskyIBUS::initChannels()
-{
-    // Resets channels to default value
-    for (size_t i = 0; i < IBUS_MAX_CHANNELS; i++)
-    {
-        _channels[i] = IBUS_DEFAULT_VALUE;
-    }
-}
-
-//
-void FlyskyIBUS::resetBuffer()
-{
-    _frame_position = 0;
-    _frameStarted = false;
 }
