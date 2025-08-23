@@ -1,28 +1,28 @@
-# FlyskyIBUS Library für ESP32
+# FlyskyIBUS Library for ESP32
 
-**Arduino IDE kompatible Flysky IBUS Empfänger-Bibliothek für den ESP32**
+**Arduino IDE compatible Flysky IBUS receiver library for ESP32**
 
-Empfang und Dekodierung von Flysky IBUS RC-Signalen direkt auf dem ESP32. Interrupt-gesteuert, non-blocking und einfach zu verwenden.
+Receive and decode Flysky IBUS RC signals directly on the ESP32. Interrupt-driven, non-blocking, and easy to use.
 
 ## Features
 
-- 📡 **Vollständiger IBUS Support** - Empfang und Dekodierung aller 14 Kanäle (1000-2000µs)
-- ⚡ **Hardware UART Interrupts** - Präzise Timing durch direkte ESP32 UART Interrupts
-- 🚫 **Non-blocking Design** - Keine Timer, keine Delays, arbeitet komplett im Hintergrund
-- 🛠️ **Plug & Play** - Ein Funktionsaufruf genügt, Library übernimmt den Rest
-- 🔧 **Konfigurierbar** - Beliebige UART-Schnittstelle und GPIO-Pin wählbar
-- ✅ **Arduino IDE Ready** - Vollständig kompatibel mit Arduino IDE und ESP32 Core
+- 📡 **Full IBUS Support** – Receive and decode all 14 channels (1000-2000µs)
+- ⚡ **Hardware UART Interrupts** – Precise timing via direct ESP32 UART interrupts
+- 🚫 **Non-blocking Design** – No timers, no delays, runs completely in the background
+- 🛠️ **Plug & Play** – One function call is enough, the library handles the rest
+- 🔧 **Configurable** – Choose any UART interface and GPIO pin
+- ✅ **Arduino IDE Ready** – Fully compatible with Arduino IDE and ESP32 Core
 
 ## Installation
 
-Bibliothek in Arduino `libraries` Ordner kopieren und Arduino IDE neustarten.
+Copy the library to your Arduino `libraries` folder and restart the Arduino IDE.
 
-## Verwendung
+## Usage
 
 ```cpp
 #include <FlyskyIBUS.h>
 
-// Standard: Serial2, GPIO16
+// Default: Serial2, GPIO16
 FlyskyIBUS ibus;
 
 void setup() {
@@ -41,19 +41,19 @@ void loop() {
 }
 ```
 
-## IBUS Frame-Struktur
+## IBUS Frame Structure
 
 ```
 Byte:  0    1     2      3      4      5    ...    28     29     30    31
 Data: 0x20 0x40 [CH1_L][CH1_H][CH2_L][CH2_H] ... [CH14L][CH14H][CHKL][CHKH]
-       |    |    |<--- Kanaldaten (28 Bytes, 14 Kanäle) --->|  |<--CRC-->|
+       |    |    |<--- Channel Data (28 Bytes, 14 Channels) --->|  |<--CRC-->|
        |    |
        Header (0x20 0x40)
 ```
 
-**115200 Baud, 8N1 • Kanalwerte: Little-Endian • CRC: 0xFFFF - Summe aller Bytes**
+**115200 Baud, 8N1 • Channel values: Little-Endian • CRC: 0xFFFF - sum of all bytes**
 
-## Hardware-Verbindung
+## Hardware Connection
 
 ```
 Flysky Receiver    ESP32
@@ -65,10 +65,10 @@ Flysky Receiver    ESP32
 ## API
 
 ```cpp
-FlyskyIBUS ibus(Serial2, GPIO_NUM_16);  // Konstruktor
-bool begin();                           // Initialisierung
-uint16_t getChannel(uint8_t channel);   // Kanal lesen (1-14)
-uint8_t getChannelCount();              // Anzahl aktiver Kanäle
+FlyskyIBUS ibus(Serial2, GPIO_NUM_16);  // Constructor
+bool begin();                           // Initialization
+uint16_t getChannel(uint8_t channel);   // Read channel (1-14)
+uint8_t getChannelCount();              // Number of active channels
 ```
 
 ## 📄 License
