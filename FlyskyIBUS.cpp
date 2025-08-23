@@ -13,8 +13,8 @@ FlyskyIBUS::FlyskyIBUS(HardwareSerial &uart, uint8_t rxPin) : _uart(&uart),
                                                               _rxPin(rxPin),
                                                               _frame_position(0),
                                                               _frameStarted(false),
-                                                              _channelCount(0),
-                                                              _frame_buffer{uint8_t(IBUS_DEFAULT_VALUE)}
+                                                              _frame_buffer{uint8_t(IBUS_DEFAULT_VALUE)},
+                                                              _channelCount(0)
 {
 }
 
@@ -44,7 +44,7 @@ uint16_t FlyskyIBUS::getChannel(const uint8_t channel_nr)
 }
 
 // Reading data bytewise into frame generator
-void IRAM_ATTR FlyskyIBUS::_ibus_handle()
+void FlyskyIBUS::_ibus_handle()
 {
     while (_uart->available())
     {
