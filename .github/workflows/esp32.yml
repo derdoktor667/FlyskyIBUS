@@ -10,14 +10,9 @@ jobs:
   checking_lib:
     runs-on: ubuntu-latest
 
-    env:
-      SKETCHES_REPORTS_PATH: sketches-reports
-
     steps:
       - uses: actions/checkout@v4
       - uses: arduino/compile-sketches@v1
         with:
           fqbn: esp32:esp32:esp32
           sketch-paths: examples/read_Channels/read_Channels.ino
-          enable-deltas-report: true
-          sketches-report-path: ${{ env.SKETCHES_REPORTS_PATH }}

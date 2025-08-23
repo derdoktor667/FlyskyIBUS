@@ -80,15 +80,15 @@ private:
     bool _frameStarted;
 
     // --- Interrupt Handling ---
-    void IRAM_ATTR _ibus_handle();
+    void _ibus_handle();
     void _generateFrame(uint8_t byte);
 
     // --- IBUS Decoder Helper --
     void _decode_channels();
 
-    // Decoded channel values
-    uint16_t _channels[IBUS_MAX_CHANNELS];
-
     // Number of channels detected
     uint8_t _channelCount;
+
+    // Decoded channel values
+    uint16_t _channels[IBUS_MAX_CHANNELS];
 };
