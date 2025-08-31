@@ -56,8 +56,6 @@ public:
 
 private:
     // --- IBUS protocol ---
-    static constexpr auto IBUS_OK = 0;
-    static constexpr auto IBUS_ERROR = 1;
     static constexpr auto IBUS_BAUDRATE = 115200;
     static constexpr auto IBUS_FRAME_LENGTH = 32;
     static constexpr auto IBUS_MAX_CHANNELS = 14;
@@ -91,4 +89,8 @@ private:
 
     // Decoded channel values
     uint16_t _channels[IBUS_MAX_CHANNELS];
+
+    // --- Error handling ---
+    static constexpr auto IBUS_OK = 0;
+    static constexpr auto IBUS_ERROR = 1;
 };
