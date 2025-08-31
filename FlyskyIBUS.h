@@ -56,8 +56,6 @@ public:
 
 private:
     // --- IBUS protocol ---
-    static constexpr auto IBUS_OK = 0;
-    static constexpr auto IBUS_ERROR = 1;
     static constexpr auto IBUS_BAUDRATE = 115200;
     static constexpr auto IBUS_FRAME_LENGTH = 32;
     static constexpr auto IBUS_MAX_CHANNELS = 14;
@@ -80,15 +78,19 @@ private:
     bool _frameStarted;
 
     // --- Interrupt Handling ---
-    void IRAM_ATTR _ibus_handle();
+    void _ibus_handle();
     void _generateFrame(uint8_t byte);
 
     // --- IBUS Decoder Helper --
     void _decode_channels();
 
+    // Number of channels detected
+    uint8_t _channelCount;
+
     // Decoded channel values
     uint16_t _channels[IBUS_MAX_CHANNELS];
 
-    // Number of channels detected
-    uint8_t _channelCount;
+    // --- Error handling ---
+    static constexpr auto IBUS_OK = 0;
+    static constexpr auto IBUS_ERROR = 1;
 };

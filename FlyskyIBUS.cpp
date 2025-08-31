@@ -6,8 +6,6 @@
  * @license MIT
  */
 
-#pragma once
-
 #include "FlyskyIBUS.h"
 
 // Initialize IBUS in "on the fly"
@@ -67,6 +65,7 @@ void FlyskyIBUS::_generateFrame(uint8_t byte)
 
         _frame_buffer[_frame_position++] = byte;
     }
+
     // Fill up the frame buffer
     else if (_frameStarted)
     {

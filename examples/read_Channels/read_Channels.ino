@@ -47,14 +47,14 @@ void loop()
     // Prints the channels to serial for example
     USB_SERIAL.print(" ");
     USB_SERIAL.print(ch_01);
-    USB_SERIAL.print(" - ");
+    USB_SERIAL.print(",");
     USB_SERIAL.print(ch_02);
-    USB_SERIAL.print(" - ");
+    USB_SERIAL.print(",");
     USB_SERIAL.print(ch_03);
-    USB_SERIAL.print(" - ");
+    USB_SERIAL.print(",");
     USB_SERIAL.print(ch_04);
     USB_SERIAL.println(" ");
 
     // Not flooding serial port
-    delay(100);
+    delayMicroseconds(1000);
 }
