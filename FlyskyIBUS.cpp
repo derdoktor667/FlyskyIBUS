@@ -61,8 +61,13 @@ uint16_t FlyskyIBUS::getRawChannel(const uint8_t channel_nr)
 // Check for failsafe condition
 bool FlyskyIBUS::hasFailsafe() const
 {
+    uint32_t lastReadTimeCopy;
+    portENTER_CRITICAL_ISR(&_mux);
+    lastReadTimeCopy = _lastReadTime;
+    portEXIT_CRITICAL_ISR(&_mux);
+
     // Failsafe is active if the timeout is exceeded or the failsafe flag is set
-    return ((millis() - _lastReadTime) > IBUS_SIGNAL_TIMEOUT) || _failsafe_flag;
+    return ((millis() - lastReadTimeCopy) > IBUS_SIGNAL_TIMEOUT) || _failsafe_flag;
 }
 
 // Reading data bytewise into frame generator
