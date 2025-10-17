@@ -63,6 +63,9 @@ public:
     // Check for failsafe condition (no new data for >100ms or failsafe flag received)
     bool hasFailsafe() const;
 
+    // Returns the configured RX pin
+    uint8_t getRxPin() const { return _rxPin; }
+
 private:
     // --- IBUS protocol ---
     static constexpr auto IBUS_BAUDRATE = 115200;
