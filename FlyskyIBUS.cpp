@@ -14,7 +14,8 @@ FlyskyIBUS::FlyskyIBUS(HardwareSerial &uart, uint8_t rxPin) : _uart(&uart),
                                                               _frame_position(0),
                                                               _channelCount(0),
                                                               _frame_buffer{uint8_t(IBUS_DEFAULT_VALUE)},
-                                                              _lastReadTime(0)
+                                                              _lastReadTime(0),
+                                                              _failsafe_flag(false)
 {
     for (size_t i = 0; i < IBUS_MAX_CHANNELS; ++i)
     {
@@ -39,12 +40,29 @@ bool FlyskyIBUS::begin()
 // Returns received value for given channel
 uint16_t FlyskyIBUS::getChannel(const uint8_t channel_nr)
 {
+    // If failsafe is active, return default value
+    if (hasFailsafe())
+        return IBUS_DEFAULT_VALUE;
+
+    return getRawChannel(channel_nr);
+}
+
+// Returns raw received value for given channel
+uint16_t FlyskyIBUS::getRawChannel(const uint8_t channel_nr)
+{
     // Simple input filter workround
     if (channel_nr < 1 || channel_nr > IBUS_MAX_CHANNELS)
         return IBUS_DEFAULT_VALUE;
 
     // Array - Human Transcoder
     return _channels[channel_nr - 1];
+}
+
+// Check for failsafe condition
+bool FlyskyIBUS::hasFailsafe() const
+{
+    // Failsafe is active if the timeout is exceeded or the failsafe flag is set
+    return ((millis() - _lastReadTime) > IBUS_SIGNAL_TIMEOUT) || _failsafe_flag;
 }
 
 // Reading data bytewise into frame generator
@@ -61,30 +79,43 @@ void IRAM_ATTR FlyskyIBUS::_ibus_handle()
 // Generates the actual IBUS frame and start processing
 void FlyskyIBUS::_generateFrame(uint8_t byte)
 {
-    if (_frame_position == 0) { // Waiting for the first header byte
-        if (byte == IBUS_HEADER_BYTE0) {
+    if (_frame_position == 0)
+    { // Waiting for the first header byte
+        if (byte == IBUS_HEADER_BYTE0)
+        {
             _frame_buffer[_frame_position++] = byte;
         }
-    } else if (_frame_position == 1) { // Waiting for the second header byte
-        if (byte == IBUS_HEADER_BYTE1) {
+    }
+    else if (_frame_position == 1)
+    {
+        if (byte == IBUS_HEADER_BYTE1)
+        {
             _frame_buffer[_frame_position++] = byte;
-        } else {
+        }
+        else
+        {
             // Reset if the second byte is not correct
             _frame_position = 0;
         }
-    } else { // Reading the rest of the frame
-        if (_frame_position < IBUS_FRAME_LENGTH) {
+    }
+    else
+    {
+        if (_frame_position < IBUS_FRAME_LENGTH)
+        {
             _frame_buffer[_frame_position++] = byte;
         }
 
-        if (_frame_position >= IBUS_FRAME_LENGTH) {
+        if (_frame_position >= IBUS_FRAME_LENGTH)
+        {
             uint16_t checksum = (_frame_buffer[31] << 8) | _frame_buffer[30];
             uint16_t calculated_checksum = 0xFFFF;
-            for (int i = 0; i < 30; i++) {
+            for (int i = 0; i < 30; i++)
+            {
                 calculated_checksum -= _frame_buffer[i];
             }
 
-            if (checksum == calculated_checksum) {
+            if (checksum == calculated_checksum)
+            {
                 _decode_channels();
             }
             _frame_position = 0;
@@ -98,13 +129,26 @@ void FlyskyIBUS::_decode_channels()
     // Calculate number of channels from payload length
     _channelCount = (_frame_buffer[0] - IBUS_HEADER_LENGTH - IBUS_CRC_LENGTH) >> 1;
 
+    bool failsafe_detected = false;
     for (size_t i = 0; i < IBUS_MAX_CHANNELS && i < _channelCount; ++i)
     {
         // Byte to channel merging
         uint8_t lowByte = _frame_buffer[PAYLOAD_HIGHBYTE + i * 2];
         uint8_t highByte = _frame_buffer[PAYLOAD_LOWBYTE + i * 2];
+        uint16_t value = (highByte << 8) | lowByte;
 
-        _channels[i] = (highByte << 8) | lowByte;
+        // Check if the channel value is within the valid range
+        if (value < IBUS_MIN_VALUE || value > IBUS_MAX_VALUE)
+        {
+            failsafe_detected = true;
+        }
+
+        _channels[i] = value;
     }
+
+    // Update the failsafe flag
+    _failsafe_flag = failsafe_detected;
+
+    // A valid frame has been received, reset the timer
     _lastReadTime = millis();
 }
