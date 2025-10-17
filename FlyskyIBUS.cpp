@@ -38,7 +38,7 @@ bool FlyskyIBUS::begin()
 }
 
 // Returns received value for given channel
-uint16_t FlyskyIBUS::getChannel(const uint8_t channel_nr)
+uint16_t FlyskyIBUS::getChannel(const uint8_t channel_nr) const
 {
     // If failsafe is active, return default value
     if (hasFailsafe())
@@ -48,7 +48,7 @@ uint16_t FlyskyIBUS::getChannel(const uint8_t channel_nr)
 }
 
 // Returns raw received value for given channel
-uint16_t FlyskyIBUS::getRawChannel(const uint8_t channel_nr)
+uint16_t FlyskyIBUS::getRawChannel(const uint8_t channel_nr) const
 {
     // Simple input filter workround
     if (channel_nr < 1 || channel_nr > IBUS_MAX_CHANNELS)
@@ -61,8 +61,13 @@ uint16_t FlyskyIBUS::getRawChannel(const uint8_t channel_nr)
 // Check for failsafe condition
 bool FlyskyIBUS::hasFailsafe() const
 {
+    uint32_t lastReadTimeCopy;
+    portENTER_CRITICAL_ISR(&_mux);
+    lastReadTimeCopy = _lastReadTime;
+    portEXIT_CRITICAL_ISR(&_mux);
+
     // Failsafe is active if the timeout is exceeded or the failsafe flag is set
-    return ((millis() - _lastReadTime) > IBUS_SIGNAL_TIMEOUT) || _failsafe_flag;
+    return ((millis() - lastReadTimeCopy) > IBUS_SIGNAL_TIMEOUT) || _failsafe_flag;
 }
 
 // Reading data bytewise into frame generator
@@ -109,7 +114,7 @@ void FlyskyIBUS::_generateFrame(uint8_t byte)
         {
             uint16_t checksum = (_frame_buffer[31] << 8) | _frame_buffer[30];
             uint16_t calculated_checksum = 0xFFFF;
-            for (int i = 0; i < 30; i++)
+            for (int i = 0; i < (IBUS_FRAME_LENGTH - IBUS_CRC_LENGTH); i++)
             {
                 calculated_checksum -= _frame_buffer[i];
             }
@@ -129,7 +134,6 @@ void FlyskyIBUS::_decode_channels()
     // Calculate number of channels from payload length
     _channelCount = (_frame_buffer[0] - IBUS_HEADER_LENGTH - IBUS_CRC_LENGTH) >> 1;
 
-    bool failsafe_detected = false;
     for (size_t i = 0; i < IBUS_MAX_CHANNELS && i < _channelCount; ++i)
     {
         // Byte to channel merging
@@ -137,17 +141,20 @@ void FlyskyIBUS::_decode_channels()
         uint8_t highByte = _frame_buffer[PAYLOAD_LOWBYTE + i * 2];
         uint16_t value = (highByte << 8) | lowByte;
 
-        // Check if the channel value is within the valid range
-        if (value < IBUS_MIN_VALUE || value > IBUS_MAX_VALUE)
-        {
-            failsafe_detected = true;
-        }
-
         _channels[i] = value;
     }
 
-    // Update the failsafe flag
-    _failsafe_flag = failsafe_detected;
+    // Check for specific failsafe condition: first four channels are 988
+    bool channel_failsafe_active = true;
+    for (size_t i = 0; i < IBUS_FAILSAFE_CHANNEL_COUNT; ++i)
+    {
+        if (_channels[i] != IBUS_FAILSAFE_CHANNEL_VALUE)
+        {
+            channel_failsafe_active = false;
+            break;
+        }
+    }
+    _failsafe_flag = channel_failsafe_active;
 
     // A valid frame has been received, reset the timer
     _lastReadTime = millis();

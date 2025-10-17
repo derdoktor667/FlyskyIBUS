@@ -49,10 +49,10 @@ public:
     bool begin();
 
     // Get value of given channel (0-based)
-    uint16_t getChannel(const uint8_t channel_nr);
+    uint16_t getChannel(const uint8_t channel_nr) const;
 
     // Get raw value of given channel (bypasses failsafe check)
-    uint16_t getRawChannel(const uint8_t channel_nr);
+    uint16_t getRawChannel(const uint8_t channel_nr) const;
 
     // Returns timestamp of last received frame
     uint32_t getReadTime() const { return _lastReadTime; }
@@ -63,21 +63,26 @@ public:
     // Check for failsafe condition (no new data for >100ms or failsafe flag received)
     bool hasFailsafe() const;
 
+    // Returns the configured RX pin
+    uint8_t getRxPin() const { return _rxPin; }
+
 private:
     // --- IBUS protocol ---
     static constexpr auto IBUS_BAUDRATE = 115200;
     static constexpr auto IBUS_FRAME_LENGTH = 32;
     static constexpr auto IBUS_MAX_CHANNELS = 14;
-    static constexpr auto IBUS_SIGNAL_TIMEOUT = 100;
+    static constexpr auto IBUS_SIGNAL_TIMEOUT = 500;
     static constexpr auto IBUS_DEFAULT_VALUE = 1500;
     static constexpr auto IBUS_MIN_VALUE = 980;
     static constexpr auto IBUS_MAX_VALUE = 2020;
+    static constexpr auto IBUS_FAILSAFE_CHANNEL_VALUE = 988;
     static constexpr auto IBUS_HEADER_BYTE0 = 0x20;
     static constexpr auto IBUS_HEADER_BYTE1 = 0x40;
     static constexpr auto IBUS_HEADER_LENGTH = 2;
     static constexpr auto IBUS_CRC_LENGTH = 2;
     static constexpr auto PAYLOAD_HIGHBYTE = 2;
     static constexpr auto PAYLOAD_LOWBYTE = 3;
+    static constexpr auto IBUS_FAILSAFE_CHANNEL_COUNT = 4;
 
     // --- Hardware Config ---
     HardwareSerial *_uart;
@@ -86,8 +91,9 @@ private:
     // --- RX Buffer ---
     uint8_t _frame_buffer[IBUS_FRAME_LENGTH];
     uint8_t _frame_position;
-    uint32_t _lastReadTime;
+    volatile uint32_t _lastReadTime;
     bool _failsafe_flag;
+    mutable portMUX_TYPE _mux = portMUX_INITIALIZER_UNLOCKED; // Mutex for critical sections
 
     // --- Interrupt Handling ---
     void _ibus_handle();
