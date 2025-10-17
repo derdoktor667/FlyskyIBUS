@@ -51,6 +51,9 @@ public:
     // Get value of given channel (0-based)
     uint16_t getChannel(const uint8_t channel_nr);
 
+    // Returns timestamp of last received frame
+    uint32_t getReadTime() const { return _lastReadTime; }
+
     // Returns number of decoded channels
     uint8_t getChannelCount() const { return _channelCount; }
 
@@ -75,7 +78,7 @@ private:
     // --- RX Buffer ---
     uint8_t _frame_buffer[IBUS_FRAME_LENGTH];
     uint8_t _frame_position;
-    bool _frameStarted;
+    uint32_t _lastReadTime;
 
     // --- Interrupt Handling ---
     void _ibus_handle();

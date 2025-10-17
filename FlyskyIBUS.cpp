@@ -12,10 +12,14 @@
 FlyskyIBUS::FlyskyIBUS(HardwareSerial &uart, uint8_t rxPin) : _uart(&uart),
                                                               _rxPin(rxPin),
                                                               _frame_position(0),
-                                                              _frameStarted(false),
                                                               _channelCount(0),
-                                                              _frame_buffer{uint8_t(IBUS_DEFAULT_VALUE)}
+                                                              _frame_buffer{uint8_t(IBUS_DEFAULT_VALUE)},
+                                                              _lastReadTime(0)
 {
+    for (size_t i = 0; i < IBUS_MAX_CHANNELS; ++i)
+    {
+        _channels[i] = IBUS_DEFAULT_VALUE;
+    }
 }
 
 // IBUS receiver "install and forget"
@@ -57,32 +61,32 @@ void IRAM_ATTR FlyskyIBUS::_ibus_handle()
 // Generates the actual IBUS frame and start processing
 void FlyskyIBUS::_generateFrame(uint8_t byte)
 {
-    // Find IBUS frame start marking
-    if (!_frameStarted && byte == IBUS_HEADER_BYTE0)
-    {
-        _frameStarted = true;
-        _frame_position = 0;
-
-        _frame_buffer[_frame_position++] = byte;
-    }
-
-    // Fill up the frame buffer
-    else if (_frameStarted)
-    {
-        // Receiving frame bytes
-        if (_frame_position < IBUS_FRAME_LENGTH)
-        {
+    if (_frame_position == 0) { // Waiting for the first header byte
+        if (byte == IBUS_HEADER_BYTE0) {
+            _frame_buffer[_frame_position++] = byte;
+        }
+    } else if (_frame_position == 1) { // Waiting for the second header byte
+        if (byte == IBUS_HEADER_BYTE1) {
+            _frame_buffer[_frame_position++] = byte;
+        } else {
+            // Reset if the second byte is not correct
+            _frame_position = 0;
+        }
+    } else { // Reading the rest of the frame
+        if (_frame_position < IBUS_FRAME_LENGTH) {
             _frame_buffer[_frame_position++] = byte;
         }
 
-        // End of IBUS frame reached
-        if (_frame_position >= IBUS_FRAME_LENGTH)
-        {
-            // TODO: use reference and return values
-            _decode_channels();
+        if (_frame_position >= IBUS_FRAME_LENGTH) {
+            uint16_t checksum = (_frame_buffer[31] << 8) | _frame_buffer[30];
+            uint16_t calculated_checksum = 0xFFFF;
+            for (int i = 0; i < 30; i++) {
+                calculated_checksum -= _frame_buffer[i];
+            }
 
-            // Dirty restart frame container
-            _frameStarted = false;
+            if (checksum == calculated_checksum) {
+                _decode_channels();
+            }
             _frame_position = 0;
         }
     }
@@ -102,4 +106,5 @@ void FlyskyIBUS::_decode_channels()
 
         _channels[i] = (highByte << 8) | lowByte;
     }
+    _lastReadTime = millis();
 }
