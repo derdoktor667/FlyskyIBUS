@@ -70,8 +70,8 @@ private:
     static constexpr auto IBUS_MAX_CHANNELS = 14;
     static constexpr auto IBUS_SIGNAL_TIMEOUT = 100;
     static constexpr auto IBUS_DEFAULT_VALUE = 1500;
-    static constexpr auto IBUS_MIN_VALUE = 1000;
-    static constexpr auto IBUS_MAX_VALUE = 2000;
+    static constexpr auto IBUS_MIN_VALUE = 980;
+    static constexpr auto IBUS_MAX_VALUE = 2020;
     static constexpr auto IBUS_HEADER_BYTE0 = 0x20;
     static constexpr auto IBUS_HEADER_BYTE1 = 0x40;
     static constexpr auto IBUS_HEADER_LENGTH = 2;
