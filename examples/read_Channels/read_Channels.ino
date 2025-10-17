@@ -35,26 +35,31 @@ void setup()
 //
 void loop()
 {
-    // No further function needed
-    // UART interrupt driven receiver
+    // Check for failsafe condition
+    if (ibus.hasFailsafe())
+    {
+        USB_SERIAL.println("FAILSAFE!");
+    }
+    else
+    {
+        // Simply get channel values
+        uint16_t ch_01 = ibus.getChannel(1);
+        uint16_t ch_02 = ibus.getChannel(2);
+        uint16_t ch_03 = ibus.getChannel(3);
+        uint16_t ch_04 = ibus.getChannel(4);
 
-    // Simply get channel values
-    uint16_t ch_01 = ibus.getChannel(1);
-    uint16_t ch_02 = ibus.getChannel(2);
-    uint16_t ch_03 = ibus.getChannel(3);
-    uint16_t ch_04 = ibus.getChannel(4);
-
-    // Prints the channels to serial for example
-    USB_SERIAL.print(" ");
-    USB_SERIAL.print(ch_01);
-    USB_SERIAL.print(",");
-    USB_SERIAL.print(ch_02);
-    USB_SERIAL.print(",");
-    USB_SERIAL.print(ch_03);
-    USB_SERIAL.print(",");
-    USB_SERIAL.print(ch_04);
-    USB_SERIAL.println(" ");
+        // Prints the channels to serial for example
+        USB_SERIAL.print(" ");
+        USB_SERIAL.print(ch_01);
+        USB_SERIAL.print(",");
+        USB_SERIAL.print(ch_02);
+        USB_SERIAL.print(",");
+        USB_SERIAL.print(ch_03);
+        USB_SERIAL.print(",");
+        USB_SERIAL.print(ch_04);
+        USB_SERIAL.println(" ");
+    }
 
     // Not flooding serial port
-    delayMicroseconds(1000);
+    delay(100);
 }
