@@ -28,12 +28,6 @@ bool FlyskyIBUS::begin()
 {
     // Setup IBUS UART
     _uart->begin(IBUS_BAUDRATE, SERIAL_8N1, _rxPin);
-
-    // Tricky UART Interrupt
-    // Install UART interrupt triggering IBUS handle
-    _uart->onReceive([this]()
-                     { this->_ibus_handle(); });
-
     return IBUS_OK;
 }
 
@@ -67,7 +61,7 @@ bool FlyskyIBUS::hasFailsafe() const
 }
 
 // Reading data bytewise into frame generator
-void IRAM_ATTR FlyskyIBUS::_ibus_handle()
+void FlyskyIBUS::read()
 {
     while (_uart->available())
     {

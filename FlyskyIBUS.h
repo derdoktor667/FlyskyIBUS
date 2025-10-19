@@ -66,6 +66,9 @@ public:
     // Returns the configured RX pin
     uint8_t getRxPin() const { return _rxPin; }
 
+    // Reads and processes available data from the serial port
+    void read();
+
 private:
     // --- IBUS protocol ---
     static constexpr auto IBUS_BAUDRATE = 115200;
@@ -95,8 +98,6 @@ private:
     bool _failsafe_flag;
     mutable portMUX_TYPE _mux = portMUX_INITIALIZER_UNLOCKED; // Mutex for critical sections
 
-    // --- Interrupt Handling ---
-    void _ibus_handle();
     void _generateFrame(uint8_t byte);
 
     // --- IBUS Decoder Helper --
