@@ -40,10 +40,6 @@ bool FlyskyIBUS::begin()
 // Returns received value for given channel
 uint16_t FlyskyIBUS::getChannel(const uint8_t channel_nr) const
 {
-    // If failsafe is active, return default value
-    if (hasFailsafe())
-        return IBUS_DEFAULT_VALUE;
-
     return getRawChannel(channel_nr);
 }
 
