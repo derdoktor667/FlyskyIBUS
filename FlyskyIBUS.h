@@ -9,8 +9,8 @@
 #pragma once
 
 #include <Arduino.h>
-#include <HardwareSerial.h>
-
+#include "src/FlyskyIBUS.h"
+ 
 /*
  * FlyskyIBUS - Arduino library for decoding Flysky IBUS protocol
  *
@@ -38,78 +38,3 @@
  * - Not all 14 channels may be active depending on transmitter configuration
  */
 
-//
-class FlyskyIBUS
-{
-public:
-    // Flysky IBUS Protocol Library
-    FlyskyIBUS(HardwareSerial &uart = Serial2, uint8_t rxPin = GPIO_NUM_16);
-
-    // Starts the IBUS receiver
-    bool begin();
-
-    // Get value of given channel (0-based)
-    uint16_t getChannel(const uint8_t channel_nr) const;
-
-    // Get raw value of given channel (bypasses failsafe check)
-    uint16_t getRawChannel(const uint8_t channel_nr) const;
-
-    // Returns timestamp of last received frame
-    uint32_t getReadTime() const { return _lastReadTime; }
-
-    // Returns number of decoded channels
-    uint8_t getChannelCount() const { return _channelCount; }
-
-    // Check for failsafe condition (no new data for >100ms or failsafe flag received)
-    bool hasFailsafe() const;
-
-    // Returns the configured RX pin
-    uint8_t getRxPin() const { return _rxPin; }
-
-    // Reads and processes available data from the serial port
-    void read();
-
-private:
-    // --- IBUS protocol ---
-    static constexpr auto IBUS_BAUDRATE = 115200;
-    static constexpr auto IBUS_FRAME_LENGTH = 32;
-    static constexpr auto IBUS_MAX_CHANNELS = 14;
-    static constexpr auto IBUS_SIGNAL_TIMEOUT = 500;
-    static constexpr auto IBUS_DEFAULT_VALUE = 1500;
-    static constexpr auto IBUS_MIN_VALUE = 980;
-    static constexpr auto IBUS_MAX_VALUE = 2020;
-    static constexpr auto IBUS_FAILSAFE_CHANNEL_VALUE = 988;
-    static constexpr auto IBUS_HEADER_BYTE0 = 0x20;
-    static constexpr auto IBUS_HEADER_BYTE1 = 0x40;
-    static constexpr auto IBUS_HEADER_LENGTH = 2;
-    static constexpr auto IBUS_CRC_LENGTH = 2;
-    static constexpr auto PAYLOAD_HIGHBYTE = 2;
-    static constexpr auto PAYLOAD_LOWBYTE = 3;
-    static constexpr auto IBUS_FAILSAFE_CHANNEL_COUNT = 4;
-
-    // --- Hardware Config ---
-    HardwareSerial *_uart;
-    uint8_t _rxPin;
-
-    // --- RX Buffer ---
-    uint8_t _frame_buffer[IBUS_FRAME_LENGTH];
-    uint8_t _frame_position;
-    volatile uint32_t _lastReadTime;
-    bool _failsafe_flag;
-    mutable portMUX_TYPE _mux = portMUX_INITIALIZER_UNLOCKED; // Mutex for critical sections
-
-    void _generateFrame(uint8_t byte);
-
-    // --- IBUS Decoder Helper --
-    void _decode_channels();
-
-    // Number of channels detected
-    uint8_t _channelCount;
-
-    // Decoded channel values
-    uint16_t _channels[IBUS_MAX_CHANNELS];
-
-    // --- Error handling ---
-    static constexpr auto IBUS_OK = 0;
-    static constexpr auto IBUS_ERROR = 1;
-};
