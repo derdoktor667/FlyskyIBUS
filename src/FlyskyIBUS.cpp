@@ -9,8 +9,9 @@
 #include "FlyskyIBUS.h"
 
 // Initialize IBUS in "on the fly"
-FlyskyIBUS::FlyskyIBUS(HardwareSerial &uart, uint8_t rxPin) : _uart(&uart),
+FlyskyIBUS::FlyskyIBUS(HardwareSerial &uart, uint8_t rxPin, uint8_t txPin) : _uart(&uart),
                                                               _rxPin(rxPin),
+                                                              _txPin(txPin),
                                                               _frame_position(0),
                                                               _channelCount(0),
                                                               _frame_buffer{uint8_t(IBUS_DEFAULT_VALUE)},
@@ -27,23 +28,13 @@ FlyskyIBUS::FlyskyIBUS(HardwareSerial &uart, uint8_t rxPin) : _uart(&uart),
 bool FlyskyIBUS::begin()
 {
     // Setup IBUS UART
-    _uart->begin(IBUS_BAUDRATE, SERIAL_8N1, _rxPin);
-
-    // Tricky UART Interrupt
-    // Install UART interrupt triggering IBUS handle
-    _uart->onReceive([this]()
-                     { this->_ibus_handle(); });
-
+    _uart->begin(IBUS_BAUDRATE, SERIAL_8N1, _rxPin, _txPin);
     return IBUS_OK;
 }
 
 // Returns received value for given channel
 uint16_t FlyskyIBUS::getChannel(const uint8_t channel_nr) const
 {
-    // If failsafe is active, return default value
-    if (hasFailsafe())
-        return IBUS_DEFAULT_VALUE;
-
     return getRawChannel(channel_nr);
 }
 
@@ -71,7 +62,7 @@ bool FlyskyIBUS::hasFailsafe() const
 }
 
 // Reading data bytewise into frame generator
-void IRAM_ATTR FlyskyIBUS::_ibus_handle()
+void FlyskyIBUS::read()
 {
     while (_uart->available())
     {
