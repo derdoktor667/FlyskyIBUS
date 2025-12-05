@@ -12,9 +12,10 @@
 FlyskyIBUS::FlyskyIBUS(HardwareSerial &uart, uint8_t rxPin, uint8_t txPin) : _uart(&uart),
                                                                              _rxPin(rxPin),
                                                                              _txPin(txPin),
-                                                                             _frame_position(0)
+                                                                             _frame_position(0),
+                                                                             _channels{IBUS_FAILSAFE_CHANNEL_VALUE},
+                                                                             _isFailsafeActive(true)
 {
-    std::fill_n(_channels, IBUS_MAX_CHANNELS, IBUS_DEFAULT_VALUE);
 }
 
 // IBUS receiver "install and forget"
@@ -118,4 +119,17 @@ void FlyskyIBUS::_decode_channels()
         // Fill the array with the decoded value
         _channels[i] = value;
     }
+
+    // Check channels for Failsafe
+    _failsafe_check();
+}
+
+void FlyskyIBUS::_failsafe_check()
+{
+    uint16_t sum = 0;
+
+    for (size_t i = 0; i < IBUS_FAILSAFE_CHANNEL_COUNT; ++i)
+        sum += _channels[i];
+
+    _isFailsafeActive = (sum <= IBUS_FAILSAVE_SUM);
 }

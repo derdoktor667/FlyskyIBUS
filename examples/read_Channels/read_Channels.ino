@@ -36,21 +36,23 @@ void setup()
 void loop()
 {
     // Simply get channel values
-    uint16_t ch_01 = ibus.getChannel(0);
-    uint16_t ch_02 = ibus.getChannel(1);
-    uint16_t ch_03 = ibus.getChannel(2);
-    uint16_t ch_04 = ibus.getChannel(3);
+    auto ch_01 = ibus.getChannel(0);
+    auto ch_02 = ibus.getChannel(1);
+    auto ch_03 = ibus.getChannel(2);
+    auto ch_04 = ibus.getChannel(3);
+    auto failsafeActive = ibus.isFailsafe();
 
     // Prints the channels to serial for example
     USB_SERIAL.print(" ");
     USB_SERIAL.print(ch_01);
-    USB_SERIAL.print(",");
+    USB_SERIAL.print(", ");
     USB_SERIAL.print(ch_02);
-    USB_SERIAL.print(",");
+    USB_SERIAL.print(", ");
     USB_SERIAL.print(ch_03);
-    USB_SERIAL.print(",");
+    USB_SERIAL.print(", ");
     USB_SERIAL.print(ch_04);
-    USB_SERIAL.println(" ");
+    USB_SERIAL.print(", Failsafe: ");
+    USB_SERIAL.println(failsafeActive ? "true" : "false");
 
     // Not flooding serial port
     delay(100);
