@@ -1,95 +1,109 @@
 # FlyskyIBUS Library for ESP32
 
-**Arduino IDE compatible Flysky IBUS receiver library for ESP32**
+[![Arduino Library Badge](https://www.ardu-badge.com/badge/FlyskyIBUS.svg)](https://www.ardu-badge.com/FlyskyIBUS)
 
-Receive and decode Flysky IBUS RC signals directly on the ESP32. Interrupt-driven, non-blocking, and easy to use.
+The FlyskyIBUS library is a powerful and user-friendly Arduino library for the ESP32, specifically designed for receiving and decoding Flysky iBUS RC signals. It enables seamless integration of your Flysky remote control into your ESP32-based projects, ideal for drones, robots, and other remote-controlled applications.
 
-## Features
+## ✨ Features at a Glance
 
-- 📡 **Full IBUS Support** – Receive and decode all 14 channels (1000-2000µs)
-- ⚡ **Hardware UART Interrupts** – Precise timing via direct ESP32 UART interrupts
-- 🚫 **Non-blocking Design** – No timers, no delays, runs completely in the background
-- 🛡️ **Robust Failsafe** – Dual failsafe detection for maximum safety
-- 🛠️ **Plug & Play** – One function call is enough, the library handles the rest
-- 🔧 **Configurable** – Choose any UART interface and GPIO pin
-- ✅ **Arduino IDE Ready** – Fully compatible with Arduino IDE and ESP32 Core
+*   **Full iBUS Protocol Support**: Receives and processes up to 14 channels from your Flysky iBUS remote control.
+*   **Non-Blocking Design**: Signal processing happens in the background via efficient hardware UART interrupts, ensuring your main loop remains responsive.
+*   **Precise Timing**: Utilizes hardware UART interrupts for reliable and accurate iBUS signal decoding.
+*   **Robust Failsafe Detection**: Integrated dual-logic failsafe detection provides additional safety in critical situations.
+*   **Flexible Configuration**: Easy adaptation of the UART interface and GPIO pins to your specific hardware.
+*   **Arduino IDE Compatibility**: Seamless integration into your existing Arduino projects and workflows.
 
-## Failsafe
+## 🤝 Compatibility
 
-The library implements a dual-logic failsafe for maximum reliability:
-1.  **Signal Loss (Timeout):** If no valid IBUS data is received for more than 100ms, the failsafe is triggered.
-2.  **Receiver Failsafe Signal:** The library detects when the receiver itself enters failsafe mode and sends channel values outside the standard range (1000-2000µs).
+This library is specifically developed for **ESP32 microcontrollers** and uses the **Arduino ESP32 Framework**.
 
-When failsafe is active, `getChannel()` will return the neutral value (1500), and `hasFailsafe()` will return `true`.
+## 🚀 Installation
 
-## Installation
+Installation is quick and easy via the Arduino Library Manager:
 
-Copy the library to your Arduino `libraries` folder and restart the Arduino IDE.
+1.  Open the **Arduino IDE**.
+2.  Navigate to `Sketch` -> `Include Library` -> `Manage Libraries...`.
+3.  Search for "**FlyskyIBUS**" in the Library Manager.
+4.  Select the library from the list and click **"Install"**.
 
-## Usage
+Alternatively, you can manually install the library by cloning or downloading the repository and moving its contents into your Arduino libraries folder (e.g., `~/Arduino/libraries/FlyskyIBUS/` on Linux/macOS or `Documents\Arduino\libraries\` on Windows).
+
+## 💡 Usage Example
+
+Here's a simple example demonstrating how to read channel values with the library:
 
 ```cpp
 #include <FlyskyIBUS.h>
 
-// Default: Serial2, GPIO16
-FlyskyIBUS ibus;
+// Create an IBUS object for Serial2
+// Default pins for Serial2 are GPIO16 (RX) and GPIO17 (TX) on many ESP32 boards.
+// Adjust the pins to your board if necessary. The TX pin is optional
+// if you only want to receive.
+FlyskyIBUS IBUS;
 
 void setup() {
   Serial.begin(115200);
-  ibus.begin();
+  Serial.println("Starting FlyskyIBUS Receiver...");
+
+  // Initialize IBUS on HardwareSerial Serial2
+  // IBUS.begin(HardwareSerial& serialPort, uint8_t rxPin, uint8_t txPin = -1);
+  IBUS.begin(Serial2, 16, 17); // Example: Serial2, RX: GPIO16, TX: GPIO17
 }
 
 void loop() {
-  uint16_t ch1 = ibus.getChannel(1);
-  uint16_t ch2 = ibus.getChannel(2);
-  
-  Serial.print(" CH1: "); Serial.println(ch1);
-  Serial.print(" CH2: "); Serial.println(ch2);
-  
-  delay(100);
+  // Process received iBUS data. This function is non-blocking.
+  IBUS.loop();
+
+  // Check if new data has been received from the receiver
+  if (IBUS.isDataReady()) {
+    // Read channel values (Channel 0 is the first channel, Channel 1 the second, etc.)
+    Serial.print("Channel 1 (Roll): ");
+    Serial.println(IBUS.readChannel(0));
+
+    Serial.print("Channel 2 (Pitch): ");
+    Serial.println(IBUS.readChannel(1));
+
+    Serial.print("Channel 3 (Throttle): ");
+    Serial.println(IBUS.readChannel(2));
+
+    Serial.print("Channel 4 (Yaw): ");
+    Serial.println(IBUS.readChannel(3));
+
+    // Optional: Read more channels
+    // ...
+  }
+
+  // Check the failsafe status
+  if (IBUS.isFailsafe()) {
+    Serial.println("!!! FAILSAFE ACTIVE !!! Signal loss or error detected.");
+  }
+
+  delay(50); // A small delay to avoid flooding the serial output
 }
 ```
 
-## IBUS Frame Structure
+You can find more detailed examples in the `examples` folder of the library.
 
-```
-Byte:  0    1     2      3      4      5    ...    28     29     30    31
-Data: 0x20 0x40 [CH1_L][CH1_H][CH2_L][CH2_H] ... [CH14L][CH14H][CHKL][CHKH]
-       |    |    |<--- Channel Data (28 Bytes, 14 Channels) --->|  |<--CRC-->|
-       |    |
-       Header (0x20 0x40)
-```
+## 💖 Contributing
 
-**115200 Baud, 8N1 • Channel values: Little-Endian • CRC: 0xFFFF - sum of all bytes**
-
-## Hardware Connection
-
-```
-Flysky Receiver    ESP32
-[IBUS] ---------> [GPIO16]
-[GND]  ---------> [GND]
-[VCC]  ---------> [3.3V/5V]
-```
-
-## API
-
-```cpp
-FlyskyIBUS ibus(Serial2, GPIO_NUM_16);  // Constructor
-bool begin();                           // Initialization
-uint16_t getChannel(uint8_t channel);   // Read channel (1-14), returns 1500 on failsafe
-uint16_t getRawChannel(uint8_t ch);     // Read channel (1-14), returns raw value
-uint8_t getChannelCount();              // Number of active channels
-bool hasFailsafe();                     // Returns true if failsafe is active
-```
+Contributions, whether in the form of bug reports, feature suggestions, or code improvements, are highly welcome! Please open an Issue or create a Pull Request on GitHub.
 
 ## 📄 License
 
-MIT License – see [LICENSE](LICENSE)
+This project is licensed under the MIT License. Details can be found in the [LICENSE](LICENSE) file.
 
 ---
 
-## 👤 Author
+## 👩‍💻 For Developers
 
-**Wastl Kraus**  
-GitHub: [@derdoktor667](https://github.com/derdoktor667)  
-Website: [wir-sind-die-matrix.de](https://wir-sind-die-matrix.de)
+Here are the `arduino-cli` commands for compiling and uploading example sketches. These are useful for development and automation.
+
+**Compiling an example sketch:**
+```bash
+arduino-cli compile --fqbn esp32:esp32:esp32 ~/Arduino/libraries/FlyskyIBUS/examples/read_Channels/read_Channels.ino
+```
+
+**Uploading to ESP32 (assuming `/dev/ttyUSB0` is the upload port):**
+```bash
+arduino-cli upload -p /dev/ttyUSB0 --fqbn esp32:esp32:esp32 ~/Arduino/libraries/FlyskyIBUS/examples/read_Channels/read_Channels.ino
+```

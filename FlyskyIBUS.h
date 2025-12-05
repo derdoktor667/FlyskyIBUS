@@ -37,4 +37,3 @@
  * - Checksum calculation: 0xFFFF minus sum of all bytes except checksum bytes
  * - Not all 14 channels may be active depending on transmitter configuration
  */
-

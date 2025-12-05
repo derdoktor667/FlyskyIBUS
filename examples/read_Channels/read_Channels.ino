@@ -10,12 +10,12 @@
 #include <FlyskyIBUS.h>
 
 // USB serial port settings
-static constexpr HardwareSerial &USB_SERIAL = Serial0;
-static constexpr uint32_t SERIAL_BAUD = 115200;
+static constexpr auto &USB_SERIAL = Serial0;
+static constexpr auto SERIAL_BAUD = 115200;
 
 // UART Configuration (optional)
-static constexpr HardwareSerial &IBUS_SERIAL = Serial2;
-static constexpr uint8_t IBUS_PIN = GPIO_NUM_16;
+static constexpr auto &IBUS_SERIAL = Serial2;
+static constexpr auto IBUS_PIN = GPIO_NUM_16;
 
 // Creates an IBUS receiver ready to use
 // FlyskyIBUS ibus(); // UART2 - Pin 16 default
@@ -35,31 +35,25 @@ void setup()
 //
 void loop()
 {
-    // Check for failsafe condition
-    if (ibus.hasFailsafe())
-    {
-        USB_SERIAL.println("FAILSAFE!");
-    }
-    else
-    {
-        // Simply get channel values
-        uint16_t ch_01 = ibus.getChannel(1);
-        uint16_t ch_02 = ibus.getChannel(2);
-        uint16_t ch_03 = ibus.getChannel(3);
-        uint16_t ch_04 = ibus.getChannel(4);
+    // Simply get channel values
+    auto ch_01 = ibus.getChannel(0);
+    auto ch_02 = ibus.getChannel(1);
+    auto ch_03 = ibus.getChannel(2);
+    auto ch_04 = ibus.getChannel(3);
+    auto failsafeActive = ibus.isFailsafe();
 
-        // Prints the channels to serial for example
-        USB_SERIAL.print(" ");
-        USB_SERIAL.print(ch_01);
-        USB_SERIAL.print(",");
-        USB_SERIAL.print(ch_02);
-        USB_SERIAL.print(",");
-        USB_SERIAL.print(ch_03);
-        USB_SERIAL.print(",");
-        USB_SERIAL.print(ch_04);
-        USB_SERIAL.println(" ");
-    }
+    // Prints the channels to serial for example
+    USB_SERIAL.print(" ");
+    USB_SERIAL.print(ch_01);
+    USB_SERIAL.print(", ");
+    USB_SERIAL.print(ch_02);
+    USB_SERIAL.print(", ");
+    USB_SERIAL.print(ch_03);
+    USB_SERIAL.print(", ");
+    USB_SERIAL.print(ch_04);
+    USB_SERIAL.print(", Failsafe: ");
+    USB_SERIAL.println(failsafeActive ? "true" : "false");
 
-    // Not flooding serial port
+    // // Not flooding serial port
     delay(100);
 }
