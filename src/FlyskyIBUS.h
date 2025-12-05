@@ -59,7 +59,8 @@ private:
     uint8_t _frame_buffer[IBUS_FRAME_LENGTH];
     uint8_t _frame_position;
 
-    void _generateFrame(uint8_t byte);
+    void _processByte(uint8_t byte);
+    void _processFrame();
     void _decode_channels();
     void _failsafe_check();
 

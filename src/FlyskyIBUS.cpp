@@ -36,57 +36,73 @@ uint16_t FlyskyIBUS::getChannel(const uint8_t channel_nr)
 
     while (_uart->available())
     {
-        // Feed the generator with UART input
-        _generateFrame(_uart->read());
+        // Feed the processor with UART input
+        _processByte(_uart->read());
     }
 
     return _channels[channel_nr];
 }
 
-// Generates the actual IBUS frame and start processing
-void FlyskyIBUS::_generateFrame(uint8_t byte)
+// Processes a single byte from the UART stream to build a frame
+void FlyskyIBUS::_processByte(uint8_t byte)
 {
-    // Frame start condition
-    if (_frame_position == IBUS_FRAME_START && byte != IBUS_HEADER_BYTE0)
-        return;
-    if (_frame_position == IBUS_HEADER_START && byte != IBUS_HEADER_BYTE1)
+    // State 0: Waiting for header byte 1 (0x20)
+    if (_frame_position == 0)
     {
-        _frame_position = IBUS_FRAME_START;
+        if (byte == IBUS_HEADER_BYTE0)
+        {
+            _frame_buffer[_frame_position++] = byte;
+        }
         return;
     }
 
-    // Fill the buffer
-    if (_frame_position < IBUS_FRAME_LENGTH)
+    // State 1: Waiting for header byte 2 (0x40)
+    if (_frame_position == 1)
     {
-        _frame_buffer[_frame_position++] = byte;
+        if (byte == IBUS_HEADER_BYTE1)
+        {
+            _frame_buffer[_frame_position++] = byte;
+        }
+        else
+        {
+            // Second byte is not the header, reset.
+            _frame_position = 0;
+        }
         return;
     }
 
-    // Received checksum
-    uint16_t checksum = (_frame_buffer[IBUS_CHECKSUM_HIGH_BYTE_INDEX] << IBUS_CRC_SHIFT) | _frame_buffer[IBUS_CHECKSUM_LOW_BYTE_INDEX];
+    // States 2 to 31: Filling the payload and checksum
+    _frame_buffer[_frame_position++] = byte;
 
-    // Calculate checksum for received bytes
-    uint16_t calculated_checksum = IBUS_CRC_MINUEND;
+    // State 32: Frame is full, process it.
+    if (_frame_position >= IBUS_FRAME_LENGTH)
+    {
+        _processFrame();
+        // Reset for the next frame
+        _frame_position = 0;
+    }
+}
 
-    // Sum up received bytes after header bytes
-    uint16_t sum = IBUS_FRAME_START;
+// Processes a complete frame, validating checksum and decoding channels
+void FlyskyIBUS::_processFrame()
+{
+    // Received checksum from the buffer
+    const uint16_t checksum = (_frame_buffer[IBUS_CHECKSUM_HIGH_BYTE_INDEX] << IBUS_BYTE_SHIFT) | _frame_buffer[IBUS_CHECKSUM_LOW_BYTE_INDEX];
 
+    // Calculate checksum for the received bytes
+    uint16_t sum = 0;
     for (size_t i = 0; i < IBUS_CHECKSUM_LOW_BYTE_INDEX; ++i)
     {
         sum += _frame_buffer[i];
     }
+    const uint16_t calculated_checksum = IBUS_CRC_MINUEND - sum;
 
-    calculated_checksum -= sum;
-
-    // Compare the checksums
+    // Compare checksums
     if (checksum == calculated_checksum)
     {
-        // All good, start decoding
+        // Checksum is valid, decode the channels
         _decode_channels();
     }
-
-    // Reset the frame
-    _frame_position = IBUS_FRAME_START;
 }
 
 // Reading and decoding buffer values into buffer array
