@@ -7,8 +7,8 @@ The FlyskyIBUS library is a powerful and user-friendly Arduino library for the E
 ## ✨ Features at a Glance
 
 *   **Full iBUS Protocol Support**: Receives and processes up to 14 channels from your Flysky iBUS remote control.
-*   **Non-Blocking Design**: Signal processing happens in the background via efficient hardware UART interrupts, ensuring your main loop remains responsive.
-*   **Precise Timing**: Utilizes hardware UART interrupts for reliable and accurate iBUS signal decoding.
+*   **Fire and Forget Operation**: No need to call any explicit `update()` or `loop()` function. Simply retrieve channel values using `getChannel()` or `getChannels()`, and the library will automatically process all available incoming iBUS data, ensuring your main loop remains clean and responsive.
+*   **Precise Timing**: Leverages hardware UART for reliable and accurate iBUS signal decoding. Data acquisition is seamlessly integrated into channel retrieval, ensuring up-to-date values without explicit polling.
 *   **Robust Failsafe Detection**: Integrated dual-logic failsafe detection provides additional safety in critical situations.
 *   **Flexible Configuration**: Easy adaptation of the UART interface and GPIO pins to your specific hardware.
 *   **Arduino IDE Compatibility**: Seamless integration into your existing Arduino projects and workflows.
@@ -45,33 +45,28 @@ void setup() {
   Serial.begin(115200);
   Serial.println("Starting FlyskyIBUS Receiver...");
 
-  // Initialize IBUS on HardwareSerial Serial2
-  // IBUS.begin(HardwareSerial& serialPort, uint8_t rxPin, uint8_t txPin = -1);
+  // Initialize IBUS on HardwareSerial Serial2, specifying RX and TX pins.
+  // The TX pin (GPIO17 in this example) is optional and only required if you intend to transmit data.
   IBUS.begin(Serial2, 16, 17); // Example: Serial2, RX: GPIO16, TX: GPIO17
 }
 
 void loop() {
-  // Process received iBUS data. This function is non-blocking.
-  IBUS.loop();
+  // Retrieve channel values. The library automatically processes any incoming iBUS data
+  // when getChannel() or getChannels() is called, so no explicit update function is needed.
+  Serial.print("Channel 1 (Roll): ");
+  Serial.println(IBUS.getChannel(0));
 
-  // Check if new data has been received from the receiver
-  if (IBUS.isDataReady()) {
-    // Read channel values (Channel 0 is the first channel, Channel 1 the second, etc.)
-    Serial.print("Channel 1 (Roll): ");
-    Serial.println(IBUS.readChannel(0));
+  Serial.print("Channel 2 (Pitch): ");
+  Serial.println(IBUS.getChannel(1));
 
-    Serial.print("Channel 2 (Pitch): ");
-    Serial.println(IBUS.readChannel(1));
+  Serial.print("Channel 3 (Throttle): ");
+  Serial.println(IBUS.getChannel(2));
 
-    Serial.print("Channel 3 (Throttle): ");
-    Serial.println(IBUS.readChannel(2));
+  Serial.print("Channel 4 (Yaw): ");
+  Serial.println(IBUS.getChannel(3));
 
-    Serial.print("Channel 4 (Yaw): ");
-    Serial.println(IBUS.readChannel(3));
-
-    // Optional: Read more channels
-    // ...
-  }
+  // Optional: Read more channels
+  // ...
 
   // Check the failsafe status
   if (IBUS.isFailsafe()) {
