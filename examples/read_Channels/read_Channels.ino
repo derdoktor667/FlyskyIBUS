@@ -55,5 +55,5 @@ void loop()
     USB_SERIAL.println(failsafeActive ? "true" : "false");
 
     // // Not flooding serial port
-    delay(100);
+    delay(50);
 }
